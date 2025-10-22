@@ -38,16 +38,7 @@ public class AIIntegrationService {
                 .build();
         this.mapper = new ObjectMapper();
     }
-    /**
-     * Extracts relevant HTML elements from the full HTML string based on a list of damaged XPaths.
-     * For each XPath, it tries to convert it to a CSS selector, finds matching elements using jsoup,
-     * and appends their HTML to the result. The output is wrapped in a <root> tag.
-     * Falls back to returning the first 20,000 characters of the original HTML if an error occurs.
-     *
-     * @param fullHtml The complete HTML content as a string.
-     * @param damagedXpaths List of damaged XPath expressions to locate elements.
-     * @return A string containing the relevant HTML elements, or a fallback snippet on error.
-     */    public String extractRelevantHtml(String fullHtml, List<String> damagedXpaths) {
+    public String extractRelevantHtml(String fullHtml, List<String> damagedXpaths) {
         try {
             Document doc = Jsoup.parse(fullHtml);
             StringBuilder trimmedHtml = new StringBuilder();
@@ -71,14 +62,6 @@ public class AIIntegrationService {
         }
     }
 
-    /**
-     * Converts a simple XPath expression to a CSS selector string.
-     * Supports only basic XPaths like //tag[@id='value'], //tag[@class='value'], and //tag.
-     * Returns null if the XPath cannot be converted.
-     *
-     * @param xpath The XPath expression to convert.
-     * @return The corresponding CSS selector, or null if unsupported.
-     */
     private String xpathToCss(String xpath) {
         // Example: //div[@id='main'] -> div#main
         if (xpath.matches("//([a-zA-Z0-9]+)\\[@id='([^']+)'\\]")) {
@@ -96,9 +79,7 @@ public class AIIntegrationService {
         return null;
     }
 
-    /**
-     * Main entry: give it damaged XPaths and an HTML snapshot file path.
-     */
+
 
 
     /*
