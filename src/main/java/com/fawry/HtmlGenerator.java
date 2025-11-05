@@ -1,5 +1,6 @@
 package com.fawry;
 
+import com.fawry.utilities.Log;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -34,7 +35,7 @@ public class HtmlGenerator {
                 filesCleaned = true;
             }
         } catch (IOException e) {
-            System.err.println("Failed to initialize HTML output directory:");
+            Log.error("Failed to initialize HTML output directory:");
             e.printStackTrace();
         }
     }
@@ -42,12 +43,12 @@ public class HtmlGenerator {
     private void cleanUpPreviousFiles() throws IOException {
         Files.walk(Paths.get(HTML_OUTPUT_DIR))
                 .filter(Files::isRegularFile)
-                .filter(path -> path.toString().endsWith(".html") || path.toString().endsWith(".txt"))
+                .filter(path -> path.toString().endsWith(".html"))
                 .forEach(path -> {
                     try {
                         Files.delete(path);
                     } catch (IOException e) {
-                        System.err.println("Failed to delete file: " + path);
+                        Log.error("Failed to delete file: " + path);
                     }
                 });
     }
@@ -117,14 +118,7 @@ public class HtmlGenerator {
         try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
             writer.write(htmlContent);
             System.out.println("Saved HTML snapshot to: " + filePath.toAbsolutePath());
-
-            String xpathFilename = HTML_OUTPUT_DIR + "/xpaths_" + timestamp + ".txt";
-            Path xpathFilePath = Paths.get(xpathFilename);
-            try (BufferedWriter xpathWriter = Files.newBufferedWriter(xpathFilePath)) {
-                xpathWriter.write("All XPaths found in HTML (" + xpaths.size() + " total):\n");
-                xpathWriter.write(String.join("\n", xpaths));
-                System.out.println("Saved XPaths to: " + xpathFilePath.toAbsolutePath());
-            }
         }
     }
+
 }
