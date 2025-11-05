@@ -23,8 +23,7 @@ public class HtmlGenerator {
 
         Document document = Jsoup.parse(htmlSource);
         List<String> xpaths = generateAllXPaths(document);
-        String enhancedHtml = createEnhancedHtml(document, xpaths);
-        saveHtmlToFile(enhancedHtml, xpaths);
+        saveHtmlToFile(document.outerHtml(), xpaths);
     }
 
     private void initializeHtmlDirectory() {
@@ -100,16 +99,6 @@ public class HtmlGenerator {
         return index;
     }
 
-    private String createEnhancedHtml(Document document, List<String> xpaths) {
-        String xpathComment = "<!-- \n" +
-                "Generated HTML with all available XPaths\n" +
-                "Total XPaths found: " + xpaths.size() + "\n" +
-                "Sample XPaths:\n" +
-                String.join("\n", xpaths.subList(0, Math.min(10, xpaths.size()))) +
-                "\n-->\n";
-        return xpathComment + document.outerHtml();
-    }
-
     private void saveHtmlToFile(String htmlContent, List<String> xpaths) throws IOException {
         String timestamp = LocalDateTime.now().format(FILE_TIMESTAMP_FORMAT);
         String filename = HTML_OUTPUT_DIR + "/snapshot_" + timestamp + ".html";
@@ -120,5 +109,4 @@ public class HtmlGenerator {
             System.out.println("Saved HTML snapshot to: " + filePath.toAbsolutePath());
         }
     }
-
 }
