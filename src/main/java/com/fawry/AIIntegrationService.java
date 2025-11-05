@@ -87,10 +87,10 @@ public class AIIntegrationService {
             String htmlSnapshotContent = readFileContent(htmlSnapshotPath);
             if (htmlSnapshotContent == null) htmlSnapshotContent = "";
 
-            // Use the new method to trim the snapshot
+            // Extract relevant HTML
             String relevantHtml = extractRelevantHtml(htmlSnapshotContent, damagedXPaths);
 
-            // Print the relevant HTML snapshot content
+            // Log the HTML snapshot content sent to the AI model
             Log.info("HTML snapshot content sent to AI model:\n" + relevantHtml);
 
             String prompt = createAnalysisPrompt(damagedXPaths, relevantHtml);
@@ -112,6 +112,7 @@ public class AIIntegrationService {
             return null;
         }
     }
+
 
 
     private String callQwenMoeAPI(String prompt) throws IOException {
