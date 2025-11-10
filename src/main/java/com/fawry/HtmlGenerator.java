@@ -106,7 +106,23 @@ public class HtmlGenerator {
 
         try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
             writer.write(htmlContent);
-            System.out.println("Saved HTML snapshot to: " + filePath.toAbsolutePath());
+            Log.info("Saved HTML snapshot to: " + filePath.toAbsolutePath());
+        }
+    }
+    public void clearHTMLSnapshotsDirectory() {
+        try {
+            Files.walk(Paths.get(HTML_OUTPUT_DIR))
+                    .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            Log.error("Failed to delete file: " + path, e);
+                        }
+                    });
+            Log.info("Cleared html_snapshots directory.");
+        } catch (IOException e) {
+            Log.error("Failed to clear html_snapshots directory.", e);
         }
     }
 }

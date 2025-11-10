@@ -81,12 +81,13 @@ public class By extends org.openqa.selenium.By {
             }
             String cleanedLocator = rawLocator.replace("By.xpath: ", "").trim();
             HtmlGenerator htmlGenerator = new HtmlGenerator();
+            htmlGenerator.clearHTMLSnapshotsDirectory();
+
             htmlGenerator.generatePageHTML(driver.getPageSource());
 
-            List<String> healedXpaths = new AIIntegrationService().autoAnalyzeAndFix(List.of(cleanedLocator));
-            if (healedXpaths != null && !healedXpaths.isEmpty()) {
-                String healedXpath = healedXpaths.get(0).trim();
-                return org.openqa.selenium.By.xpath(healedXpath);
+            String healedXpath = new AIIntegrationService().autoAnalyzeAndFix(cleanedLocator);
+            if (healedXpath != null && !healedXpath.isEmpty()) {
+                return org.openqa.selenium.By.xpath(healedXpath.trim());
             }
         } catch (Exception e) {
             Log.info("❌ Healing process failed for: " + rawLocator);
@@ -94,6 +95,7 @@ public class By extends org.openqa.selenium.By {
         }
         return null;
     }
+
 
     @Override
     public String toString() {

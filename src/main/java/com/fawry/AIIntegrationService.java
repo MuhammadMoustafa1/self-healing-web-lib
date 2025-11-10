@@ -14,15 +14,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 public class AIIntegrationService {
     private static final String QWENMOE_API_URL = "http://10.100.55.98:8660/v1/chat/completions";
@@ -41,79 +35,30 @@ public class AIIntegrationService {
         this.mapper = new ObjectMapper();
     }
 
-    public String extractRelevantHtml(String fullHtml, List<String> damagedXpaths) {
-        try {
-            Document doc = Jsoup.parse(fullHtml);
-            StringBuilder trimmedHtml = new StringBuilder();
-            trimmedHtml.append("<root>\n");
-
-            for (String xpath : damagedXpaths) {
-                // Simple XPath to CSS conversion (for demo purposes)
-                String cssSelector = xpathToCss(xpath);
-                if (cssSelector == null) continue;
-                Elements elements = doc.select(cssSelector);
-                for (Element el : elements) {
-                    trimmedHtml.append(el.outerHtml()).append("\n");
-                }
-            }
-
-            trimmedHtml.append("</root>");
-            return trimmedHtml.toString();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return fullHtml.substring(0, Math.min(fullHtml.length(), 20000));
-        }
-    }
-
-    private String xpathToCss(String xpath) {
-        // Example: //div[@id='main'] -> div#main
-        if (xpath.matches("//([a-zA-Z0-9]+)\\[@id='([^']+)'\\]")) {
-            return xpath.replaceAll("//([a-zA-Z0-9]+)\\[@id='([^']+)'\\]", "$1#$2");
-        }
-        // Example: //span[@class='foo'] -> span.foo
-        if (xpath.matches("//([a-zA-Z0-9]+)\\[@class='([^']+)'\\]")) {
-            return xpath.replaceAll("//([a-zA-Z0-9]+)\\[@class='([^']+)'\\]", "$1.$2");
-        }
-        // Example: //button -> button
-        if (xpath.matches("//([a-zA-Z0-9]+)")) {
-            return xpath.replaceAll("//([a-zA-Z0-9]+)", "$1");
-        }
-        // Add more rules as needed
-        return null;
-    }
-
-    public List<String> analyzeAndGenerateXPaths(List<String> damagedXPaths, String htmlSnapshotPath) {
+    public String analyzeAndGenerateXPath(String damagedXPath, String htmlSnapshotPath) {
         try {
             String htmlSnapshotContent = readFileContent(htmlSnapshotPath);
             if (htmlSnapshotContent == null) htmlSnapshotContent = "";
 
-            // Extract relevant HTML
-            String relevantHtml = extractRelevantHtml(htmlSnapshotContent, damagedXPaths);
-
-            // Log the HTML snapshot content sent to the AI model
-            Log.info("HTML snapshot content sent to AI model:\n" + relevantHtml);
-
-            String prompt = createAnalysisPrompt(damagedXPaths, relevantHtml);
+            String prompt = createAnalysisPrompt(damagedXPath, htmlSnapshotContent);
             Log.info("Sending request to AI model with prompt:\n" + prompt);
 
             String aiResponse = callQwenMoeAPI(prompt);
-            List<String> xpaths = extractXPathFromAIResponse(aiResponse);
+            String xpath = extractXPathFromAIResponse(aiResponse);
 
-            if (xpaths == null || xpaths.isEmpty()) {
-                Log.info("Failed to extract valid XPaths from AI response");
+            if (xpath == null || xpath.isEmpty()) {
+                Log.info("Failed to extract valid XPath from AI response");
                 return null;
             }
 
-            Log.info("Generated XPaths from AI analysis: " + xpaths);
-            return xpaths;
+            Log.info("Generated XPath from AI analysis: " + xpath);
+            return xpath;
 
         } catch (Exception e) {
             Log.error("AI analysis failed", e);
             return null;
         }
     }
-
-
 
     private String callQwenMoeAPI(String prompt) throws IOException {
         ObjectNode requestBody = mapper.createObjectNode();
@@ -174,93 +119,55 @@ public class AIIntegrationService {
         }
     }
 
-    /**
-     * Create prompt for the AI with damaged XPaths and HTML snapshot.
-     */
-//    private String createAnalysisPrompt(List<String> damagedXPaths, String htmlSnapshot) {
-//        StringBuilder listBuilder = new StringBuilder();
-//        for (int i = 0; i < damagedXPaths.size(); i++) {
-//            listBuilder.append(i + 1).append(". ").append(damagedXPaths.get(i)).append("\n");
-//        }
-//
-//        return String.format(
-//                "ROLE: You are a locator repair assistant for Selenium Web UI automation.\n" +
-//                        "TASK: Repair the XPath locators that no longer match elements, using the provided HTML snapshot.\n\n" +
-//                        "INPUT:\n" +
-//                        "1) Damaged XPath List:\n%s\n\n" +
-//                        "2) HTML Snapshot:\n'''\n%s\n'''\n\n" +
-//                        "REPAIR RULES:\n" +
-//                        "- For each damaged XPath, find the closest corresponding element in the HTML.\n" +
-//                        "- Construct a corrected XPath that uniquely identifies the element.\n" +
-//                        "- Prioritize attributes in this order: @id → @name → stable part of @class → visible text → other attributes.\n" +
-//                        "- Only use contains() when exact attribute match is not possible.\n" +
-//                        "- Avoid long absolute XPaths like /html/body/... unless no better option exists.\n" +
-//                        "- Final XPath must be short, readable, and stable.\n\n" +
-//                        "OUTPUT FORMAT (STRICT):\n" +
-//                        "- Output only the corrected XPath expressions.\n" +
-//                        "- One XPath per line.\n" +
-//                        "- Do not include explanations, comments, or extra text.\n",
-//                listBuilder.toString().trim(),
-//                htmlSnapshot
-//        );
-//    }
-
-    private String createAnalysisPrompt(List<String> damagedXPaths, String htmlSnapshot) {
-        StringBuilder listBuilder = new StringBuilder();
-        for (int i = 0; i < damagedXPaths.size(); i++) {
-            listBuilder.append(i + 1).append(". ").append(damagedXPaths.get(i)).append("\n");
-        }
+    private String createAnalysisPrompt(String damagedLocator, String htmlSnapshot) {
+        boolean hasContains = damagedLocator != null && damagedLocator.contains("contains(");
 
         return String.format(
-                "ROLE: You are an expert Selenium XPath locator repair engine.\n\n" +
+                "ROLE: You are an expert Selenium locator repair engine.\n\n" +
                         "INPUT:\n" +
-                        "1) Damaged XPath List:\n%s\n\n" +
+                        "1) Damaged Locator (could be XPath, id, cssSelector, className, tagName, linkText, or partialLinkText):\n%s\n\n" +
                         "2) HTML Snapshot:\n'''\n%s\n'''\n\n" +
                         "TASK:\n" +
-                        "- For each XPath in the list, attempt to locate the intended target element in the provided HTML.\n" +
-                        "- If the element still exists but the XPath no longer matches, generate a corrected and stable XPath.\n" +
-                        "- If the element is not present in the snapshot or cannot be confidently matched, generate a **new** stable XPath that best identifies the element **based on the original locator’s intent**.\n\n" +
-                        "XPATH CONSTRUCTION RULES:\n" +
-                        "- Prefer short, stable, attribute-based XPath.\n" +
+                        "- Attempt to locate the intended target element in the provided HTML.\n" +
+                        "- If the element still exists but the locator no longer matches, generate a corrected and stable locator of the SAME TYPE if possible.\n" +
+                        "- If the element is not present or cannot be confidently matched, generate a **new** stable locator (preferably of the same type, otherwise fallback to XPath) that best identifies the element **based on the original locator’s intent**.\n\n" +
+                        "LOCATOR CONSTRUCTION RULES:\n" +
+                        "- Prefer short, stable, attribute-based locators.\n" +
                         "- Attribute priority order: @id → @name → stable part of @class → visible text → other attributes.\n" +
-                        "- Only use contains() when exact attribute match is not possible.\n" +
-                        "- Avoid absolute paths like /html/body.\n" +
-                        "- XPath must uniquely identify the element.\n\n" +
+                        "- Only use contains() in XPath when exact attribute match is not possible.\n" +
+                        (hasContains
+                                ? "- The original damaged XPath uses contains(); if possible, preserve or adapt contains() logic in the corrected XPath.\n"
+                                : "") +
+                        "- When matching visible text, if the text in HTML contains leading or trailing spaces, keep them exactly as they appear (do not trim spaces).\n" +
+                        "- Avoid absolute paths like /html/body in XPath.\n" +
+                        "- Locator must uniquely identify the element.\n\n" +
                         "OUTPUT FORMAT (IMPORTANT):\n" +
-                        "- Output **only** the corrected/new XPath values.\n" +
-                        "- One XPath per line.\n" +
+                        "- Output **only** the corrected/new locator value.\n" +
                         "- No explanations, no reasoning, no markdown, no labels.\n",
-                listBuilder.toString().trim(),
+                damagedLocator,
                 htmlSnapshot
         );
     }
 
-
-    private List<String> extractXPathFromAIResponse(String response) {
+    private String extractXPathFromAIResponse(String response) {
         String cleanedResponse = response.replaceAll("^```", "")
                 .replaceAll("```$", "")
                 .trim();
-        Pattern xpathPattern = Pattern.compile("(//[^\\s]+\\[(?:@[^\\]]+|contains\\([^\\]]+\\))\\])");
-        Matcher matcher = xpathPattern.matcher(cleanedResponse);
-        List<String> xpaths = new java.util.ArrayList<>();
-        while (matcher.find()) {
-            String xpath = matcher.group(1);
-            xpaths.add(xpath);
-            Log.info("Extracted XPath: " + xpath);
+        // Extract the first non-empty line as the XPath
+        for (String line : cleanedResponse.split("\\r?\\n")) {
+            String xpath = line.trim();
+            if (!xpath.isEmpty()) {
+                Log.info("Extracted XPath: " + xpath);
+                return xpath;
+            }
         }
-
-        if (xpaths.isEmpty()) {
-            Log.info("AI response doesn't contain valid XPath: " + response);
-        }
-        return xpaths;
+        Log.info("AI response doesn't contain valid XPath: " + response);
+        return null;
     }
 
-    /**
-     * Example runner: auto-load latest HTML snapshot with dummy damaged list
-     */
-    public List<String> autoAnalyzeAndFix(List<String> damagedXPaths) {
+    public String autoAnalyzeAndFix(String damagedXPath) {
         String timestamp = LocalDateTime.now().format(FILE_TIMESTAMP_FORMAT);
         String htmlSnapshotPath = "html_snapshots/snapshot_" + timestamp + ".html";
-        return analyzeAndGenerateXPaths(damagedXPaths, htmlSnapshotPath);
+        return analyzeAndGenerateXPath(damagedXPath, htmlSnapshotPath);
     }
 }
